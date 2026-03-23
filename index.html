@@ -947,10 +947,14 @@
                         meaning: String(r[2] || '')
                     }));
 
+                    // localStorage에 단어 데이터 저장
+                    saveWords();
+
                     // localStorage에서 하트 복원
                     loadHearts();
 
                     currentIndex = 0;
+                    saveCurrentIndex();
                     isFlipped = false;
                     renderCard();
                     showScreen(cardScreen);
@@ -960,6 +964,38 @@
                 }
             };
             reader.readAsArrayBuffer(file);
+        }
+
+        // ─── 단어 데이터 저장/복원 ───
+        function saveWords() {
+            localStorage.setItem('wordcard_words', JSON.stringify(words));
+        }
+
+        function loadSavedWords() {
+            try {
+                const saved = localStorage.getItem('wordcard_words');
+                if (saved) {
+                    words = JSON.parse(saved);
+                    return words.length > 0;
+                }
+            } catch { }
+            return false;
+        }
+
+        function clearSavedWords() {
+            localStorage.removeItem('wordcard_words');
+            localStorage.removeItem('wordcard_currentIndex');
+        }
+
+        function saveCurrentIndex() {
+            localStorage.setItem('wordcard_currentIndex', currentIndex);
+        }
+
+        function loadCurrentIndex() {
+            try {
+                const saved = localStorage.getItem('wordcard_currentIndex');
+                return saved ? parseInt(saved) || 0 : 0;
+            } catch { return 0; }
         }
 
         // ─── 하트 저장/복원 ───
@@ -1054,6 +1090,7 @@
             setTimeout(() => {
                 card3d.classList.remove(slideOut, 'flipped');
                 currentIndex = newIndex;
+                saveCurrentIndex();
                 isFlipped = false;
                 renderCard();
                 card3d.classList.add(slideIn);
@@ -1124,9 +1161,14 @@
 
         // ─── 뒤로가기 ───
         document.getElementById('btnBack').addEventListener('click', () => {
-            showScreen(uploadScreen);
-            // 파일 입력 리셋
-            fileInput.value = '';
+            if (confirm('새 파일을 업로드하시겠습니까?\n\n확인: 새 파일 업로드 화면으로 이동\n취소: 현재 카드 유지')) {
+                clearSavedWords();
+                words = [];
+                hearts = {};
+                localStorage.removeItem('wordcard_hearts');
+                showScreen(uploadScreen);
+                fileInput.value = '';
+            }
         });
 
         // ─── 리스트 뷰 ───
@@ -1189,6 +1231,18 @@
             div.textContent = text;
             return div.innerHTML;
         }
+
+        // ─── 페이지 로드 시 저장된 데이터 복원 ───
+        (function initApp() {
+            if (loadSavedWords()) {
+                loadHearts();
+                currentIndex = loadCurrentIndex();
+                if (currentIndex >= words.length) currentIndex = 0;
+                isFlipped = false;
+                renderCard();
+                showScreen(cardScreen);
+            }
+        })();
     </script>
 </body>
 
