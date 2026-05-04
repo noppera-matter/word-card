@@ -787,12 +787,12 @@
             <h1 class="upload-title">단어 카드</h1>
             <p class="upload-subtitle">나만의 엑셀 파일로<br>단어 카드를 만들어 보세요</p>
 
-            <div class="dropzone" id="dropzone">
+            <label class="dropzone" id="dropzone" for="fileInput">
                 <span class="dropzone-icon">📂</span>
                 <h3>엑셀 파일을 드래그 & 드롭</h3>
                 <p>또는 탭하여 파일 선택</p>
-                <input type="file" class="file-input" id="fileInput" accept=".xlsx,.xls">
-            </div>
+                <input type="file" class="file-input" id="fileInput" accept=".xlsx, .xls">
+            </label>
 
             <div class="upload-guide">
                 <h4>📋 엑셀 형식 안내</h4>
@@ -923,7 +923,6 @@
         }
 
         // ─── 파일 업로드 ───
-        dropzone.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', e => {
             if (e.target.files.length > 0) processFile(e.target.files[0]);
         });
