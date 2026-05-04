@@ -904,6 +904,13 @@
         const STORAGE_INDEX_KEY = 'wordcard_currentIndex';
         const STORAGE_HEARTS_KEY = 'wordcard_hearts';
         const STORAGE_SAVE_TIME_KEY = 'wordcard_savedAt';
+        const DB_NAME = 'wordcard_db';
+        const DB_VERSION = 1;
+        const DB_STORE = 'app_state';
+        const DB_WORDS_KEY = 'words';
+        const DB_INDEX_KEY = 'currentIndex';
+        const DB_HEARTS_KEY = 'hearts';
+        const DB_SAVE_TIME_KEY = 'savedAt';
 
         let words = [];        // [{ word, errors, meaning }]
         let hearts = {};       // { index: true }
@@ -946,6 +953,67 @@
             }
         }
 
+        function openStateDb() {
+            return new Promise((resolve, reject) => {
+                if (!window.indexedDB) {
+                    reject(new Error('IndexedDB is not supported'));
+                    return;
+                }
+
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = event => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(DB_STORE)) {
+                        db.createObjectStore(DB_STORE);
+                    }
+                };
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        function idbRequest(request) {
+            return new Promise((resolve, reject) => {
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function idbGet(key) {
+            const db = await openStateDb();
+            try {
+                const tx = db.transaction(DB_STORE, 'readonly');
+                return await idbRequest(tx.objectStore(DB_STORE).get(key));
+            } finally {
+                db.close();
+            }
+        }
+
+        async function idbSet(key, value) {
+            const db = await openStateDb();
+            try {
+                const tx = db.transaction(DB_STORE, 'readwrite');
+                await idbRequest(tx.objectStore(DB_STORE).put(value, key));
+            } finally {
+                db.close();
+            }
+        }
+
+        async function idbDelete(keys) {
+            const db = await openStateDb();
+            try {
+                const tx = db.transaction(DB_STORE, 'readwrite');
+                keys.forEach(key => tx.objectStore(DB_STORE).delete(key));
+                await new Promise((resolve, reject) => {
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                    tx.onabort = () => reject(tx.error);
+                });
+            } finally {
+                db.close();
+            }
+        }
+
         window.addEventListener('beforeunload', () => {
             saveWords();
             saveCurrentIndex();
@@ -975,7 +1043,7 @@
             reader.onerror = function() {
                 alert('파일을 읽는 중 오류가 발생했습니다.');
             };
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 try {
                     var data = new Uint8Array(e.target.result);
                     var wb = XLSX.read(data, { type: 'array' });
@@ -999,12 +1067,12 @@
                         };
                     });
 
-                    // localStorage에 단어 데이터 저장
+                    // 브라우저 저장소에 단어 데이터 저장
                     saveWords();
                     requestPersistentStorage();
 
-                    // localStorage에서 하트 복원
-                    loadHearts();
+                    // 브라우저 저장소에서 하트 복원
+                    await loadHearts();
 
                     currentIndex = 0;
                     saveCurrentIndex();
@@ -1022,24 +1090,42 @@
         }
 
         // ─── 단어 데이터 저장/복원 ───
+        // IndexedDB is more reliable than localStorage for mobile local/PWA use.
         function saveWords() {
+            var savedAt = new Date().toISOString();
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
-                localStorage.setItem(STORAGE_SAVE_TIME_KEY, new Date().toISOString());
+                localStorage.setItem(STORAGE_SAVE_TIME_KEY, savedAt);
             } catch (e) {
-                console.warn('저장 용량 초과: ', e);
-                alert('파일 용량이 커서 브라우저 캐시에 저장할 수 없습니다. (현재 화면에서만 카드가 표시되며, 새로고침 시 다시 업로드해야 합니다.)');
+                console.warn('localStorage saveWords error', e);
             }
+
+            idbSet(DB_WORDS_KEY, words).catch(e => {
+                console.warn('IndexedDB saveWords error', e);
+                alert('브라우저 저장소에 단어 데이터를 저장하지 못했습니다. 앱을 다시 열면 엑셀 파일을 다시 등록해야 할 수 있습니다.');
+            });
+            idbSet(DB_SAVE_TIME_KEY, savedAt).catch(e => console.warn('IndexedDB save time error', e));
         }
 
-        function loadSavedWords() {
+        async function loadSavedWords() {
+            try {
+                var savedWords = await idbGet(DB_WORDS_KEY);
+                if (Array.isArray(savedWords) && savedWords.length > 0) {
+                    words = savedWords;
+                    return true;
+                }
+            } catch (e) { console.warn('IndexedDB loadSavedWords error', e); }
+
             try {
                 var saved = localStorage.getItem(STORAGE_KEY);
                 if (saved) {
                     words = JSON.parse(saved);
-                    return words.length > 0;
+                    if (words.length > 0) {
+                        idbSet(DB_WORDS_KEY, words).catch(e => console.warn('IndexedDB migration error', e));
+                        return true;
+                    }
                 }
-            } catch (e) { console.warn('loadSavedWords 오류', e); }
+            } catch (e) { console.warn('localStorage loadSavedWords error', e); }
             return false;
         }
 
@@ -1048,32 +1134,51 @@
             localStorage.removeItem(STORAGE_INDEX_KEY);
             localStorage.removeItem(STORAGE_HEARTS_KEY);
             localStorage.removeItem(STORAGE_SAVE_TIME_KEY);
+            idbDelete([DB_WORDS_KEY, DB_INDEX_KEY, DB_HEARTS_KEY, DB_SAVE_TIME_KEY]).catch(e => console.warn('IndexedDB clear error', e));
         }
 
         function saveCurrentIndex() {
             localStorage.setItem(STORAGE_INDEX_KEY, currentIndex);
+            idbSet(DB_INDEX_KEY, currentIndex).catch(e => console.warn('IndexedDB saveCurrentIndex error', e));
         }
 
-        function loadCurrentIndex() {
+        async function loadCurrentIndex() {
+            try {
+                var savedIndex = await idbGet(DB_INDEX_KEY);
+                if (savedIndex !== undefined && savedIndex !== null) {
+                    return parseInt(savedIndex) || 0;
+                }
+            } catch (e) { console.warn('IndexedDB loadCurrentIndex error', e); }
+
             try {
                 var saved = localStorage.getItem(STORAGE_INDEX_KEY);
                 return saved ? parseInt(saved) || 0 : 0;
             } catch (e) { return 0; }
         }
 
-        // ─── 하트 저장/복원 ───
         function saveHearts() {
             localStorage.setItem(STORAGE_HEARTS_KEY, JSON.stringify(hearts));
+            idbSet(DB_HEARTS_KEY, hearts).catch(e => console.warn('IndexedDB saveHearts error', e));
         }
 
-        function loadHearts() {
+        async function loadHearts() {
+            try {
+                var savedHearts = await idbGet(DB_HEARTS_KEY);
+                if (savedHearts && typeof savedHearts === 'object') {
+                    hearts = savedHearts;
+                    return;
+                }
+            } catch (e) { console.warn('IndexedDB loadHearts error', e); }
+
             try {
                 var saved = localStorage.getItem(STORAGE_HEARTS_KEY);
                 hearts = saved ? JSON.parse(saved) : {};
+                if (Object.keys(hearts).length > 0) {
+                    idbSet(DB_HEARTS_KEY, hearts).catch(e => console.warn('IndexedDB hearts migration error', e));
+                }
             } catch (e) { hearts = {}; }
         }
 
-        // ─── 카드 렌더링 ───
         function renderCard() {
             if (words.length === 0) return;
 
@@ -1302,11 +1407,11 @@
         }
 
         // ─── 페이지 로드 시 저장된 데이터 복원 ───
-        (function initApp() {
-            if (loadSavedWords()) {
+        (async function initApp() {
+            if (await loadSavedWords()) {
                 requestPersistentStorage();
-                loadHearts();
-                currentIndex = loadCurrentIndex();
+                await loadHearts();
+                currentIndex = await loadCurrentIndex();
                 if (currentIndex >= words.length) currentIndex = 0;
                 isFlipped = false;
                 renderCard();

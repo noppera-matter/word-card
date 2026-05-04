@@ -1,8 +1,9 @@
 {
   "name": "단어 카드",
   "short_name": "단어카드",
-  "description": "나만의 엑셀 파일로 단어 카드를 만들어 보세요",
+  "description": "나만의 엑셀 파일로 단어 카드를 만들어 보는 앱",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#6366f1",
