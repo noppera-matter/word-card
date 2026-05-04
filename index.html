@@ -932,7 +932,6 @@
         fileInput.addEventListener('change', e => {
             if (e.target.files.length > 0) {
                 processFile(e.target.files[0]);
-                e.target.value = ''; // 동일 파일 재업로드 지원
             }
         });
 
@@ -982,9 +981,11 @@
                     isFlipped = false;
                     renderCard();
                     showScreen(cardScreen);
+                    fileInput.value = '';
                 } catch (err) {
                     alert('파일을 읽는 중 오류가 발생했습니다.\nA열: 핵심단어, B열: 오답여부, C열: 키워드, D열: 설명 형식인지 확인해 주세요.');
                     console.error(err);
+                    fileInput.value = '';
                 }
             };
             reader.readAsArrayBuffer(file);
