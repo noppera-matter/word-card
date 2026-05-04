@@ -900,6 +900,11 @@
 
     <script>
         // ─── 상태 관리 ───
+        const STORAGE_KEY = 'wordcard_words';
+        const STORAGE_INDEX_KEY = 'wordcard_currentIndex';
+        const STORAGE_HEARTS_KEY = 'wordcard_hearts';
+        const STORAGE_SAVE_TIME_KEY = 'wordcard_savedAt';
+
         let words = [];        // [{ word, errors, meaning }]
         let hearts = {};       // { index: true }
         let currentIndex = 0;
@@ -930,6 +935,22 @@
             [uploadScreen, cardScreen, listScreen].forEach(s => s.classList.remove('active'));
             screen.classList.add('active');
         }
+
+        function requestPersistentStorage() {
+            if (navigator.storage && navigator.storage.persist) {
+                navigator.storage.persist().then(granted => {
+                    console.log('Persistent storage granted:', granted);
+                }).catch(err => {
+                    console.warn('Persistent storage 요청 실패:', err);
+                });
+            }
+        }
+
+        window.addEventListener('beforeunload', () => {
+            saveWords();
+            saveCurrentIndex();
+            saveHearts();
+        });
 
         // ─── 파일 업로드 ───
         fileInput.addEventListener('change', e => {
@@ -980,6 +1001,7 @@
 
                     // localStorage에 단어 데이터 저장
                     saveWords();
+                    requestPersistentStorage();
 
                     // localStorage에서 하트 복원
                     loadHearts();
@@ -1002,7 +1024,8 @@
         // ─── 단어 데이터 저장/복원 ───
         function saveWords() {
             try {
-                localStorage.setItem('wordcard_words', JSON.stringify(words));
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+                localStorage.setItem(STORAGE_SAVE_TIME_KEY, new Date().toISOString());
             } catch (e) {
                 console.warn('저장 용량 초과: ', e);
                 alert('파일 용량이 커서 브라우저 캐시에 저장할 수 없습니다. (현재 화면에서만 카드가 표시되며, 새로고침 시 다시 업로드해야 합니다.)');
@@ -1011,39 +1034,41 @@
 
         function loadSavedWords() {
             try {
-                var saved = localStorage.getItem('wordcard_words');
+                var saved = localStorage.getItem(STORAGE_KEY);
                 if (saved) {
                     words = JSON.parse(saved);
                     return words.length > 0;
                 }
-            } catch (e) { }
+            } catch (e) { console.warn('loadSavedWords 오류', e); }
             return false;
         }
 
         function clearSavedWords() {
-            localStorage.removeItem('wordcard_words');
-            localStorage.removeItem('wordcard_currentIndex');
+            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(STORAGE_INDEX_KEY);
+            localStorage.removeItem(STORAGE_HEARTS_KEY);
+            localStorage.removeItem(STORAGE_SAVE_TIME_KEY);
         }
 
         function saveCurrentIndex() {
-            localStorage.setItem('wordcard_currentIndex', currentIndex);
+            localStorage.setItem(STORAGE_INDEX_KEY, currentIndex);
         }
 
         function loadCurrentIndex() {
             try {
-                var saved = localStorage.getItem('wordcard_currentIndex');
+                var saved = localStorage.getItem(STORAGE_INDEX_KEY);
                 return saved ? parseInt(saved) || 0 : 0;
             } catch (e) { return 0; }
         }
 
         // ─── 하트 저장/복원 ───
         function saveHearts() {
-            localStorage.setItem('wordcard_hearts', JSON.stringify(hearts));
+            localStorage.setItem(STORAGE_HEARTS_KEY, JSON.stringify(hearts));
         }
 
         function loadHearts() {
             try {
-                var saved = localStorage.getItem('wordcard_hearts');
+                var saved = localStorage.getItem(STORAGE_HEARTS_KEY);
                 hearts = saved ? JSON.parse(saved) : {};
             } catch (e) { hearts = {}; }
         }
@@ -1279,12 +1304,15 @@
         // ─── 페이지 로드 시 저장된 데이터 복원 ───
         (function initApp() {
             if (loadSavedWords()) {
+                requestPersistentStorage();
                 loadHearts();
                 currentIndex = loadCurrentIndex();
                 if (currentIndex >= words.length) currentIndex = 0;
                 isFlipped = false;
                 renderCard();
                 showScreen(cardScreen);
+            } else {
+                requestPersistentStorage();
             }
         })();
     </script>
