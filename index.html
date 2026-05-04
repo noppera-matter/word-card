@@ -158,7 +158,13 @@
             font-size: 0.85rem;
         }
 
-        .file-input { display: none; }
+        .file-input {
+            width: 0;
+            height: 0;
+            opacity: 0;
+            position: absolute;
+            z-index: -1;
+        }
 
         .upload-guide {
             margin-top: 40px;
@@ -924,7 +930,10 @@
 
         // ─── 파일 업로드 ───
         fileInput.addEventListener('change', e => {
-            if (e.target.files.length > 0) processFile(e.target.files[0]);
+            if (e.target.files.length > 0) {
+                processFile(e.target.files[0]);
+                e.target.value = ''; // 동일 파일 재업로드 지원
+            }
         });
 
         dropzone.addEventListener('dragover', e => {
