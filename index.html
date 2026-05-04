@@ -983,7 +983,7 @@
                     showScreen(cardScreen);
                     fileInput.value = '';
                 } catch (err) {
-                    alert('파일을 읽는 중 오류가 발생했습니다.\nA열: 핵심단어, B열: 오답여부, C열: 키워드, D열: 설명 형식인지 확인해 주세요.');
+                    alert('파일 처리 중 오류가 발생했습니다.\n에러 내용: ' + err.message + '\n\n(A열: 핵심단어, B열: 오답여부, C열: 키워드, D열: 설명 형식인지 확인해 주세요.)');
                     console.error(err);
                     fileInput.value = '';
                 }
@@ -993,7 +993,12 @@
 
         // ─── 단어 데이터 저장/복원 ───
         function saveWords() {
-            localStorage.setItem('wordcard_words', JSON.stringify(words));
+            try {
+                localStorage.setItem('wordcard_words', JSON.stringify(words));
+            } catch (e) {
+                console.warn('저장 용량 초과: ', e);
+                alert('파일 용량이 커서 브라우저 캐시에 저장할 수 없습니다. (현재 화면에서만 카드가 표시되며, 새로고침 시 다시 업로드해야 합니다.)');
+            }
         }
 
         function loadSavedWords() {
