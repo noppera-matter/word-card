@@ -202,7 +202,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 16px 20px 10px;
+            padding: calc(env(safe-area-inset-top, 0px) + 36px) 20px 10px;
             flex-shrink: 0;
         }
 
@@ -411,9 +411,20 @@
             margin: 20px 0;
         }
 
-        .card-back-errors {
+        .card-front-keyword {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #facc15;
+            margin-top: 16px;
+        }
+
+        .card-front-errors {
+            position: absolute;
+            bottom: 24px;
             display: flex;
             align-items: center;
+            justify-content: center;
+            width: 100%;
             gap: 8px;
             font-size: 0.9rem;
             color: rgba(196, 181, 253, 0.7);
@@ -573,7 +584,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 16px 20px 14px;
+            padding: calc(env(safe-area-inset-top, 0px) + 36px) 20px 14px;
             flex-shrink: 0;
         }
 
@@ -786,9 +797,10 @@
             <div class="upload-guide">
                 <h4>📋 엑셀 형식 안내</h4>
                 <p>
-                    <code>A열</code> 단어 &nbsp;|&nbsp;
-                    <code>B열</code> 틀린횟수 &nbsp;|&nbsp;
-                    <code>C열</code> 의미
+                    <code>A열</code> 핵심단어 &nbsp;|&nbsp;
+                    <code>B열</code> 오답여부 &nbsp;|&nbsp;
+                    <code>C열</code> 키워드 &nbsp;|&nbsp;<br>
+                    <code>D열</code> 설명
                 </p>
             </div>
         </div>
@@ -796,7 +808,7 @@
         <!-- ═══ 스크린 2: 카드 뷰 ═══ -->
         <div class="screen card-screen" id="cardScreen">
             <div class="top-bar">
-                <button class="btn-back" id="btnBack">←</button>
+                <button class="btn-back" id="btnHome" style="font-size: 1.4rem;">🏠</button>
                 <span class="top-bar-title" id="topBarTitle">단어 카드</span>
                 <button class="btn-list" id="btnListView">☰</button>
             </div>
@@ -814,17 +826,17 @@
             <div class="card-area" id="cardArea">
                 <div class="card-3d" id="card3d">
                     <div class="card-face card-front-face">
-                        <div class="card-front-label">WORD</div>
+                        <div class="card-front-label">핵심단어</div>
                         <div class="card-front-word" id="cardWord">-</div>
+                        <div class="card-front-keyword" id="cardKeyword">-</div>
                         <div class="card-front-hint">
-                            <span class="tap-icon">👆</span> 탭하여 뜻 확인
+                            <span class="tap-icon">👆</span> 탭하여 설명 확인
                         </div>
+                        <div class="card-front-errors" id="cardErrors">-</div>
                     </div>
                     <div class="card-face card-back-face">
-                        <div class="card-back-label">MEANING</div>
+                        <div class="card-back-label">설명</div>
                         <div class="card-back-meaning" id="cardMeaning">-</div>
-                        <div class="card-back-divider"></div>
-                        <div class="card-back-errors" id="cardErrors">-</div>
                     </div>
                 </div>
             </div>
@@ -861,9 +873,12 @@
         <!-- ═══ 스크린 3: 리스트 뷰 ═══ -->
         <div class="screen list-screen" id="listScreen">
             <div class="list-header">
-                <button class="btn-back" id="btnListBack">←</button>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-back" id="btnListBack">←</button>
+                    <button class="btn-back" id="btnListHome" style="font-size: 1.4rem;" title="처음 화면으로">🏠</button>
+                </div>
                 <h2>전체 단어 목록</h2>
-                <div style="width:42px"></div>
+                <div style="width:92px"></div>
             </div>
             <div class="list-filter-row">
                 <button class="filter-btn active" data-filter="all">전체</button>
@@ -944,7 +959,8 @@
                     words = rows.map(r => ({
                         word: String(r[0] || ''),
                         errors: parseInt(r[1]) || 0,
-                        meaning: String(r[2] || '')
+                        keyword: String(r[2] || ''),
+                        meaning: String(r[3] || '')
                     }));
 
                     // localStorage에 단어 데이터 저장
@@ -959,7 +975,7 @@
                     renderCard();
                     showScreen(cardScreen);
                 } catch (err) {
-                    alert('파일을 읽는 중 오류가 발생했습니다.\nA열: 단어, B열: 틀린횟수, C열: 의미 형식인지 확인해 주세요.');
+                    alert('파일을 읽는 중 오류가 발생했습니다.\nA열: 핵심단어, B열: 오답여부, C열: 키워드, D열: 설명 형식인지 확인해 주세요.');
                     console.error(err);
                 }
             };
@@ -1016,6 +1032,7 @@
 
             const w = words[currentIndex];
             cardWord.textContent = w.word;
+            document.getElementById('cardKeyword').textContent = w.keyword;
             cardMeaning.textContent = w.meaning;
 
             // 틀린 횟수
@@ -1119,6 +1136,21 @@
             touchStartY = e.touches[0].clientY;
         }, { passive: true });
 
+        // ─── 홈으로 가기 ───
+        function goHome() {
+            if (confirm('처음 화면으로 돌아가시겠습니까?\n\n확인: 현재 진행 상황이 초기화되고 홈으로 이동합니다.\n취소: 현재 화면 유지')) {
+                clearSavedWords();
+                words = [];
+                hearts = {};
+                localStorage.removeItem('wordcard_hearts');
+                showScreen(uploadScreen);
+                fileInput.value = '';
+            }
+        }
+
+        document.getElementById('btnHome').addEventListener('click', goHome);
+        document.getElementById('btnListHome').addEventListener('click', goHome);
+
         document.getElementById('cardArea').addEventListener('touchend', e => {
             const dx = e.changedTouches[0].clientX - touchStartX;
             const dy = e.changedTouches[0].clientY - touchStartY;
@@ -1160,7 +1192,7 @@
         });
 
         // ─── 뒤로가기 ───
-        document.getElementById('btnBack').addEventListener('click', () => {
+        // document.getElementById('btnBack').addEventListener('click', () => {
             if (confirm('새 파일을 업로드하시겠습니까?\n\n확인: 새 파일 업로드 화면으로 이동\n취소: 현재 카드 유지')) {
                 clearSavedWords();
                 words = [];
