@@ -950,13 +950,16 @@
         });
 
         function processFile(file) {
-            const reader = new FileReader();
-            reader.onload = e => {
+            var reader = new FileReader();
+            reader.onerror = function() {
+                alert('파일을 읽는 중 오류가 발생했습니다.');
+            };
+            reader.onload = function(e) {
                 try {
-                    const data = new Uint8Array(e.target.result);
-                    const wb = XLSX.read(data, { type: 'array' });
-                    const sheet = wb.Sheets[wb.SheetNames[0]];
-                    let rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                    var data = new Uint8Array(e.target.result);
+                    var wb = XLSX.read(data, { type: 'array' });
+                    var sheet = wb.Sheets[wb.SheetNames[0]];
+                    var rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
                     // 헤더 행 감지 (B열이 숫자가 아니면 헤더)
                     if (rows.length > 0 && typeof rows[0][1] === 'string' && isNaN(Number(rows[0][1]))) {
@@ -964,14 +967,16 @@
                     }
 
                     // 빈 행 제거
-                    rows = rows.filter(r => r && r.length >= 1 && r[0] !== undefined && r[0] !== '');
+                    rows = rows.filter(function(r) { return r && r.length >= 1 && r[0] !== undefined && r[0] !== ''; });
 
-                    words = rows.map(r => ({
-                        word: String(r[0] || ''),
-                        errors: parseInt(r[1]) || 0,
-                        keyword: String(r[2] || ''),
-                        meaning: String(r[3] || '')
-                    }));
+                    words = rows.map(function(r) {
+                        return {
+                            word: String(r[0] || ''),
+                            errors: parseInt(r[1]) || 0,
+                            keyword: String(r[2] || ''),
+                            meaning: String(r[3] || '')
+                        };
+                    });
 
                     // localStorage에 단어 데이터 저장
                     saveWords();
@@ -986,19 +991,7 @@
                     showScreen(cardScreen);
                     fileInput.value = '';
                 } catch (err) {
-                    const dbg = document.createElement('div');
-                    dbg.style.position = 'fixed';
-                    dbg.style.top = '0';
-                    dbg.style.left = '0';
-                    dbg.style.background = 'red';
-                    dbg.style.color = 'white';
-                    dbg.style.zIndex = '999999';
-                    dbg.style.padding = '20px';
-                    dbg.style.fontSize = '16px';
-                    dbg.innerHTML = '에러 발생: <br>' + err.message + '<br>' + err.stack;
-                    document.body.appendChild(dbg);
-                    
-                    alert('파일 처리 중 오류가 발생했습니다.\n에러 내용: ' + err.message + '\n\n(A열: 핵심단어, B열: 오답여부, C열: 키워드, D열: 설명 형식인지 확인해 주세요.)');
+                    alert('파일 처리 중 오류: ' + err.message);
                     console.error(err);
                     fileInput.value = '';
                 }
@@ -1018,12 +1011,12 @@
 
         function loadSavedWords() {
             try {
-                const saved = localStorage.getItem('wordcard_words');
+                var saved = localStorage.getItem('wordcard_words');
                 if (saved) {
                     words = JSON.parse(saved);
                     return words.length > 0;
                 }
-            } catch { }
+            } catch (e) { }
             return false;
         }
 
@@ -1038,9 +1031,9 @@
 
         function loadCurrentIndex() {
             try {
-                const saved = localStorage.getItem('wordcard_currentIndex');
+                var saved = localStorage.getItem('wordcard_currentIndex');
                 return saved ? parseInt(saved) || 0 : 0;
-            } catch { return 0; }
+            } catch (e) { return 0; }
         }
 
         // ─── 하트 저장/복원 ───
@@ -1050,9 +1043,9 @@
 
         function loadHearts() {
             try {
-                const saved = localStorage.getItem('wordcard_hearts');
+                var saved = localStorage.getItem('wordcard_hearts');
                 hearts = saved ? JSON.parse(saved) : {};
-            } catch { hearts = {}; }
+            } catch (e) { hearts = {}; }
         }
 
         // ─── 카드 렌더링 ───
@@ -1220,17 +1213,7 @@
             renderCard();
         });
 
-        // ─── 뒤로가기 ───
-        // document.getElementById('btnBack').addEventListener('click', () => {
-            if (confirm('새 파일을 업로드하시겠습니까?\n\n확인: 새 파일 업로드 화면으로 이동\n취소: 현재 카드 유지')) {
-                clearSavedWords();
-                words = [];
-                hearts = {};
-                localStorage.removeItem('wordcard_hearts');
-                showScreen(uploadScreen);
-                fileInput.value = '';
-            }
-        });
+        // ─── 뒤로가기 (goHome으로 대체됨 - 삭제) ───
 
         // ─── 리스트 뷰 ───
         document.getElementById('btnListView').addEventListener('click', () => {
